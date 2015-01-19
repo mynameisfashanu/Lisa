@@ -6,7 +6,8 @@
 
 static char buffer[2048];
 
-char* readline(char* prompt) {
+char* readline(char* prompt) 
+{
   fputs(prompt, stdout);
   fgets(buffer, 2048, stdin);
   char* cpy = malloc(strlen(buffer)+1);
@@ -28,7 +29,8 @@ void add_history(char* unused) {}
 /* Add SYM and SEXPR as possible lval types */
 enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR };
 
-typedef struct lval {
+typedef struct lval 
+{
   int type;
   long num;
   /* Error and Symbol types have some string data */
@@ -40,7 +42,8 @@ typedef struct lval {
 } lval;
 
 /* Construct a pointer to a new Number lval */ 
-lval* lval_num(long x) {
+lval* lval_num(long x) 
+{
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_NUM;
   v->num = x;
@@ -49,7 +52,8 @@ lval* lval_num(long x) {
 
 /* Construct a pointer to a new Error lval */ 
 //return error as a string. 
-lval* lval_err(char* m) {
+lval* lval_err(char* m) 
+{
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_ERR;
   v->err = malloc(strlen(m) + 1);
@@ -58,7 +62,8 @@ lval* lval_err(char* m) {
 }
 
 /* Construct a pointer to a new Symbol lval */ 
-lval* lval_sym(char* s) {
+lval* lval_sym(char* s) 
+{
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_SYM;
   v->sym = malloc(strlen(s) + 1);
@@ -67,7 +72,8 @@ lval* lval_sym(char* s) {
 }
 
 /* A pointer to a new empty Sexpr lval */
-lval* lval_sexpr(void) {
+lval* lval_sexpr(void) 
+{
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_SEXPR;
   v->count = 0;
@@ -85,7 +91,8 @@ lval* lval_qexpr(void)
 
 }
 
-void lval_del(lval* v) {
+void lval_del(lval* v) 
+{
 
   switch (v->type) {
     /* Do nothing special for number type */
@@ -98,7 +105,8 @@ void lval_del(lval* v) {
     /* If Sexpr then delete all elements inside */
 	case LVAL_QEXPR:
     case LVAL_SEXPR:
-      for (int i = 0; i < v->count; i++) {
+      for (int i = 0; i < v->count; i++) 
+	  {
         lval_del(v->cell[i]);
       }
       /* Also free the memory allocated to contain the pointers */
@@ -110,14 +118,16 @@ void lval_del(lval* v) {
   free(v);
 }
 
-lval* lval_add(lval* v, lval* x) {
+lval* lval_add(lval* v, lval* x) 
+{
   v->count++;
   v->cell = realloc(v->cell, sizeof(lval*) * v->count);
   v->cell[v->count-1] = x;
   return v;
 }
 
-lval* lval_pop(lval* v, int i) {
+lval* lval_pop(lval* v, int i) 
+{
   /* Find the item at "i" */
   lval* x = v->cell[i];
   
@@ -152,23 +162,28 @@ lval* lval_take(lval* v, int i) {
 
 void lval_print(lval* v);
 
-void lval_expr_print(lval* v, char open, char close) {
+void lval_expr_print(lval* v, char open, char close) 
+{
   putchar(open);
-  for (int i = 0; i < v->count; i++) {
+  for (int i = 0; i < v->count; i++) 
+  {
     
     /* Print Value contained within */
     lval_print(v->cell[i]);
     
     /* Don't print trailing space if last element */
-    if (i != (v->count-1)) {
+    if (i != (v->count-1)) 
+	{
       putchar(' ');
     }
   }
   putchar(close);
 }
 
-void lval_print(lval* v) {
-  switch (v->type) {
+void lval_print(lval* v) 
+{
+  switch (v->type) 
+  {
     case LVAL_NUM:   printf("%li", v->num); break;
     case LVAL_ERR:   printf("Error: %s", v->err); break;
     case LVAL_SYM:   printf("%s", v->sym); break;
@@ -189,14 +204,76 @@ lval* builtin_list(lval* a)
 {
 	a->type = LVAL_QEXPR;
 	return a;
-}	
-	
+}
 
-lval* builtin_op(lval* a, char* op) {
+lval* builtin_head(lval* a)
+{
+	LASSERT(a, a->count == 1,
+		"Function 'head' passed too many arguments.");
+	LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
+		"Function 'head' passed incorrect type.");
+	LASSERT(a, a->cell[0]->count != 0,
+		"Function 'head' passed {}.");
+		
+	lval* v = lval_take(a,0);
+	while(a->count > 1) {lval_del(lval_pop(v,1));}
+	return v;
+
+}	
+
+lval* builtin_tail(lval* a)
+{
+	LASSERT(a, a->count == 1,
+		"Function 'tail' passed too many arguments.");
+	LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
+		"Function 'tail' passed incorrect type.");
+	LASSERT(a, a->cell[0]->count != 0,
+		"Function 'tail' passed {}");
+		
+	lval* v = lval_take(a,0);
+	lval_del(lval_pop(v,0));
+	return v;
+}
+
+lval* builtin_eval(lval* a)
+{
+	LASSERT(a, a->count == 1,
+		"Function 'eval' passed too many arguments.");
+	LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
+		"Function 'eval' passed incorrect type.");
+	
+	lval* x = lval_take(a, 0);
+	x->type = LVAL_SEXPR;
+	return lval_eval(x);
+}
+
+lval* builtin_join(lval* a)
+{
+	for(int i = 0; i < a->count; i++)
+	{
+		LASSERT(a, a->cell[i]->type == LVAL_QEXPR,
+			"Fuction 'join' passed incorrect type.");
+	}
+	
+	lval* x = lval_pop(a,0);
+	
+	while(a->count)
+	{
+		x = lval_join(x,lval_pop(a,0));
+	}
+	
+	lval_del(a);
+	return x;
+}
+
+lval* builtin_op(lval* a, char* op) 
+{
   
   /* Ensure all arguments are numbers */
-  for (int i = 0; i < a->count; i++) {
-    if (a->cell[i]->type != LVAL_NUM) {
+  for (int i = 0; i < a->count; i++) 
+  {
+    if (a->cell[i]->type != LVAL_NUM) 
+	{
       lval_del(a);
       return lval_err("Cannot operate on non-number!");
     }
@@ -206,12 +283,14 @@ lval* builtin_op(lval* a, char* op) {
   lval* x = lval_pop(a, 0);
   
   /* If no arguments and sub then perform unary negation */
-  if ((strcmp(op, "-") == 0) && a->count == 0) {
+  if ((strcmp(op, "-") == 0) && a->count == 0) 
+  {
     x->num = -x->num;
   }
   
   /* While there are still elements remaining */
-  while (a->count > 0) {
+  while (a->count > 0) 
+  {
   
     /* Pop the next element */
     lval* y = lval_pop(a, 0);
@@ -220,18 +299,16 @@ lval* builtin_op(lval* a, char* op) {
     if (strcmp(op, "+") == 0) { x->num += y->num; }
     if (strcmp(op, "-") == 0) { x->num -= y->num; }
     if (strcmp(op, "*") == 0) { x->num *= y->num; }
-    if (strcmp(op, "/") == 0) {
-      if (y->num == 0) {
+    if (strcmp(op, "/") == 0) 
+	{
+      if (y->num == 0) 
+	  {
         lval_del(x); lval_del(y);
         x = lval_err("Division By Zero.");
         break;
       }
-      x->num /= y->num; //(div x /y)
-    }
-    
-	//can't free memory that before we return  :)
-	
-	
+      x->num /= y->num;
+    }	
     /* Delete element now finished with */
     lval_del(y);
   }
@@ -241,7 +318,18 @@ lval* builtin_op(lval* a, char* op) {
   return x;
 }
 
-lval* lval_eval(lval* v);
+lval* builtin(lval* a, char* func)
+{
+	if(strcmp("list", func) == 0) {	return builtin_list(a);	}
+	if(strcmp("head", func) == 0) {	return builtin_head(a);	}
+	if(strcmp("tail", func) == 0) {	return builtin_tail(a);	}
+	if(strcmp("join", func) == 0) {	return builtin_join(a);	}
+	if(strcmp("eval", func) == 0) {	return builtin_eval(a);	}
+	if(strcmp("+-/*", func)) {	return builtin_op(a, func);	}
+	lval_del(a);
+	return lval_err("Unknown Function!");
+
+}
 
 lval* lval_eval_sexpr(lval* v) {
   
@@ -269,7 +357,7 @@ lval* lval_eval_sexpr(lval* v) {
   }
   
   /* Call builtin with operator */
-  lval* result = builtin_op(v, f->sym);
+  lval* result = builtin(v, f->sym);
   lval_del(f);
   return result;
 }
@@ -298,6 +386,7 @@ lval* lval_read(mpc_ast_t* t) {
   lval* x = NULL;
   if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); } 
   if (strstr(t->tag, "sexpr"))  { x = lval_sexpr(); }
+  if (strstr(t->tag, "qexpr"))  { x = lval_qexpr(); }
   
   /* Fill this list with any valid expression contained within */
   for (int i = 0; i < t->children_num; i++) {
@@ -317,18 +406,21 @@ int main(int argc, char** argv) {
   mpc_parser_t* Number = mpc_new("number");
   mpc_parser_t* Symbol = mpc_new("symbol");
   mpc_parser_t* Sexpr  = mpc_new("sexpr");
+  mpc_parser_t* Qexpr  = mpc_new("qexpr");
   mpc_parser_t* Expr   = mpc_new("expr");
   mpc_parser_t* Lispy  = mpc_new("lispy");
   
   mpca_lang(MPCA_LANG_DEFAULT,
-    "                                          \
-      number : /-?[0-9]+/ ;                    \
-      symbol : '+' | '-' | '*' | '/' ;         \
-      sexpr  : '(' <expr>* ')' ;               \
-      expr   : <number> | <symbol> | <sexpr> ; \
-      lispy  : /^/ <expr>* /$/ ;               \
+    "                                          				\
+      number : /-?[0-9]+/ ;                    				\
+      symbol : \"list\" | \"head\" | \"tail\" | \"eval\"	\
+			 |'+' | '-' | '*' | '/' ;         				\
+      sexpr  : '(' <expr>* ')' ;  							\
+	  qexpr  : '{' <expr>* '}' ;							\
+      expr   : <number> | <symbol> | <sexpr> ; 				\
+      lispy  : /^/ <expr>* /$/ ;               				\
     ",
-    Number, Symbol, Sexpr, Expr, Lispy);
+    Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
   
   puts("Lispy Version 0.0.0.0.5");
   puts("Press Ctrl+c to Exit\n");
@@ -353,7 +445,7 @@ int main(int argc, char** argv) {
     
   }
   
-  mpc_cleanup(5, Number, Symbol, Sexpr, Expr, Lispy);
+  mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
   
   return 0;
 }
