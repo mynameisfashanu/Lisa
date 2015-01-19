@@ -1,3 +1,5 @@
+//cc -std=c99 -Wall parsing.c mpc.c -o parsing
+
 #include "mpc.h"
 
 #ifdef _WIN32
@@ -24,7 +26,7 @@ void add_history(char* unused) {}
 
 
 /* Add SYM and SEXPR as possible lval types */
-enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR };
+enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR };
 
 typedef struct lval {
   int type;
@@ -73,6 +75,16 @@ lval* lval_sexpr(void) {
   return v;
 }
 
+lval* lval_qexpr(void)
+{
+	lval* v = malloc(sizeof(lval));
+	v->type = LVAL_QEXPR;
+	v->count = 0;
+	v->cell = NULL;
+	return v;
+
+}
+
 void lval_del(lval* v) {
 
   switch (v->type) {
@@ -84,6 +96,7 @@ void lval_del(lval* v) {
     case LVAL_SYM: free(v->sym); break;
     
     /* If Sexpr then delete all elements inside */
+	case LVAL_QEXPR:
     case LVAL_SEXPR:
       for (int i = 0; i < v->count; i++) {
         lval_del(v->cell[i]);
@@ -120,6 +133,17 @@ lval* lval_pop(lval* v, int i) {
   return x;
 }
 
+lval* lval_join(lval* x, lval* y)
+{
+	while(y->count)
+	{
+		x = lval_add(x,lval_pop(y,0));
+	}
+	
+	lval_del(y);
+	return x;
+}
+
 lval* lval_take(lval* v, int i) {
   lval* x = lval_pop(v, i);
   lval_del(v);
@@ -149,10 +173,24 @@ void lval_print(lval* v) {
     case LVAL_ERR:   printf("Error: %s", v->err); break;
     case LVAL_SYM:   printf("%s", v->sym); break;
     case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
+	case LVAL_QEXPR: lval_expr_print(v,	'{', '}'); break;
   }
 }
 
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
+
+#define LASSERT(args, cond, err) \
+	if (!(cond)) { lval_del(args); return lval_err(err); } 
+
+	
+lval* lval_eval(lval* v);
+
+lval* builtin_list(lval* a)
+{
+	a->type = LVAL_QEXPR;
+	return a;
+}	
+	
 
 lval* builtin_op(lval* a, char* op) {
   
