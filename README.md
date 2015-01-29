@@ -3,7 +3,7 @@ Lisa
 
 A simple lisp implementation. 
 
-This is an educational project with limited functionality. The primary purpose is to learn about the fundamental principles of functional programming - lisps in particular, and compiler theory. .This code is based on buildyourownlisp. I have added serveral additional functions to make it a unique and original language. 
+This is an educational project with limited functionality. The primary purpose is to learn about the fundamental principles of functional programming - lisps in particular, and compiler theory.
 
 
 Future Features 
@@ -17,4 +17,3 @@ Future Features
 8. List literals
 9. Pool allocation
 10. Static typing
-11. Macros
